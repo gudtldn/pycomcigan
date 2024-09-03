@@ -9,7 +9,7 @@ from .comcigan_dataclasses import (
     Lecture,
     TimeTableData,
     _ComciganCode,
-    _SchoolInfo,
+    SchoolInfo,
 )
 
 
@@ -17,11 +17,9 @@ class EWeek(Enum):
     THIS_WEEK = 0
     NEXT_WEEK = 1
 
-
+# TODO: dataclass로 변경
 class TimeTable:
-    school_code: int # TODO: dataclasses.py에 있는 _SchoolInfo를 사용하도록 수정
-    school_name: str
-    local_code: int
+    school_info: SchoolInfo
     local_name: str
     school_year: int
     start_date: str
@@ -30,6 +28,7 @@ class TimeTable:
     timetable: list[list[list[TimeTableData]]]
     _homeroom_teacher: list[list[str]]
 
+    # TODO: classmethod로 변경
     def __init__(self,
                  school_name: str,
                  local_code: int = 0,
@@ -55,14 +54,13 @@ class TimeTable:
         _code = RequestComcigan.get_code()
         _school_info = RequestComcigan.get_school_code(school_name, local_code, school_code, _code.comcigan_code)
 
+        # TODO: request는 모두 RequestComcigan 클래스로 옮기기
         sc = base64.b64encode(f"{str(_code.code0)}_{_school_info.code}_0_{str(week.value + 1)}".encode('utf-8'))
         resp = requests.get(f'{RequestComcigan.comcigan_url}{_code.comcigan_code[:7]}{str(sc)[2:-1]}', headers=RequestComcigan.headers)
         resp.encoding = 'UTF-8'
         resp_json = json.loads(resp.text.split('\n')[0])
 
-        self.school_code = _school_info.code # TODO: dataclasses.py에 있는 _SchoolInfo를 사용하도록 수정
-        self.school_name = _school_info.name
-        self.local_code = _school_info.region_code
+        self.school_info = _school_info
         self.local_name = resp_json["지역명"]
         self.school_year = resp_json["학년도"]
         self.start_date = resp_json["시작일"]
@@ -101,10 +99,11 @@ class TimeTable:
 
                         data[grade][cls][day].append(
                             TimeTableData(
-                                period=period,
-                                subject=sub_list[period_num // 1000],
-                                teacher=teacher_list[period_num % 100],
-                                replaced=period_num != original_period,
+                                lecture=Lecture(
+                                    period=period,
+                                    subject=sub_list[period_num // 1000],
+                                    teacher=teacher_list[period_num % 100],
+                                ),
                                 original=None if period_num == original_period else Lecture(
                                     period=period,
                                     subject=sub_list[original_period // 1000],
@@ -127,19 +126,19 @@ class TimeTable:
                     homeroom_teacher[grade][cls] = teacher_list[homeroom_teacher[grade][cls]]
         self._homeroom_teacher = homeroom_teacher
 
-    def homeroom(self, grade: int, cls: int):
+    def homeroom(self, grade: int, class_num: int):
         """
         :param grade: 학년
-        :param cls: 반
+        :param class_num: 반
         :return: 담임 선생님
         """
-        return self._homeroom_teacher[grade - 1][cls - 1]
+        return self._homeroom_teacher[grade - 1][class_num - 1]
 
     def __str__(self):
         return (
-            f"학교 코드: {self.school_code}\n"
-            f"학교명: {self.school_name}\n"
-            f"지역 코드: {self.local_code}\n"
+            f"학교 코드: {self.school_info.code}\n"
+            f"학교명: {self.school_info.name}\n"
+            f"지역 코드: {self.school_info.region_code}\n"
             f"지역명: {self.local_name}\n"
             f"학년도: {self.school_year}\n"
             f"시작일: {self.start_date}\n"
@@ -179,7 +178,7 @@ class RequestComcigan:
         school_code: int,
         local_code: int,
         comcigan_code: str
-    ) -> _SchoolInfo:
+    ) -> SchoolInfo:
         resp = requests.get(f'{cls.comcigan_url}{comcigan_code}{parse.quote(school_name, encoding="euc-kr")}', headers=cls.headers)
         resp.encoding = 'UTF-8'
         resp_json = json.loads(resp.text.strip(chr(0)))
@@ -188,12 +187,12 @@ class RequestComcigan:
         elif len(resp_json["학교검색"]) >= 2:  # 2개 이상이 검색될 경우
             if school_code:
                 data = next(filter(lambda data: data[3] == school_code, resp_json["학교검색"]))
-                return _SchoolInfo(data[2], data[3], data[0])
+                return SchoolInfo(data[2], data[3], data[0])
             if local_code:
                 data = next(filter(lambda data: data[1] == local_code, resp_json["학교검색"]))
-                return _SchoolInfo(data[2], data[3], data[0])
+                return SchoolInfo(data[2], data[3], data[0])
             raise RuntimeError('학교가 2개 이상 존재합니다. local_code 또는 school_code를 입력해주세요.')
-        return _SchoolInfo(
+        return SchoolInfo(
             resp_json["학교검색"][0][2],
             resp_json["학교검색"][0][3],
             resp_json["학교검색"][0][0],
