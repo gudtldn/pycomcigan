@@ -1,6 +1,6 @@
 import setuptools
 
-with open("README.md", "r", encoding='UTF-8') as fh:
+with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
@@ -14,14 +14,12 @@ setuptools.setup(
     url="https://github.com/hegelty/pycomcigan",
     packages=setuptools.find_packages(),
     install_requires=[
-        'requests',
-        'beautifulsoup4',
-        'urllib3'
-        ],
+        "requests",
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent"
-        ],
-    python_requires='>=3.9'
+    ],
+    python_requires=">=3.9"
 )
